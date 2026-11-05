@@ -1,0 +1,41 @@
+# Plan de OWASP ZAP (Automation Framework): la prueba DAST como código
+env:
+  contexts:
+    - name: staging
+      urls:
+        - http://localhost:5000
+  parameters:
+    failOnError: true
+    progressToStdout: true
+
+jobs:
+  - type: alertFilter        # falso positivo documentado, no escondido
+    alertFilters:
+      # 10106 "HTTP Only Site": nuestro staging corre en localhost sin TLS.
+      # En producción este hallazgo SÍ sería real; aquí no aplica.
+      - ruleId: 10106
+        newRisk: Info
+
+  - type: spider             # recorre la app siguiendo enlaces y formularios
+    parameters:
+      maxDuration: 1
+
+  - type: passiveScan-wait   # revisa respuestas sin atacar: cabeceras, cookies...
+    parameters:
+      maxDuration: 2
+
+  - type: activeScan         # ataca de verdad: XSS, inyecciones...
+    parameters:
+      maxRuleDurationInMins: 1
+      maxScanDurationInMins: 4
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: ${WORKSPACE}/reports
+      reportFile: zap-report
+
+  - type: exitStatus         # quality gate: Alto = falla, Medio = inestable
+    parameters:
+      errorLevel: High
+      warnLevel: Medium
